@@ -23,6 +23,8 @@
 
 #include <ssd1306/ssd1306.h>
 
+#include <mpu6050/mpu6050.h>
+
 
 //USER DEFINES
 #define BUTTON GPIO_Pin_14
@@ -37,7 +39,7 @@
 
 uint8_t buff[DISPLAY_HEIGHT*DISPLAY_WIDTH/8];
 
-// int i2c_master_port = I2C_NUM_0;
+int i2c_master_port = I2C_NUM_0;
 
 static const char *TAG = "time";
 
@@ -46,14 +48,20 @@ static const char *REQUEST = "GET " WEB_URL " HTTP/1.1\r\n"
     "User-Agent: esp-idf/1.0 esp32\r\n"
     "\r\n";
 
-ssd1306_t dev = 
-    {
-        .i2c_port = I2C_NUM_0,
-        .i2c_addr = SSD1306_I2C_ADDR_0,
-        .screen = SSD1306_SCREEN, // or SH1106_SCREEN
-        .width = DISPLAY_WIDTH,
-        .height = DISPLAY_HEIGHT
-    };
+ssd1306_t oled = 
+{
+    .i2c_port = I2C_NUM_0,
+    .i2c_addr = SSD1306_I2C_ADDR_0,
+    .screen = SSD1306_SCREEN, // or SH1106_SCREEN
+    .width = DISPLAY_WIDTH,
+    .height = DISPLAY_HEIGHT
+};
+
+mpu6050_t mpu6050 = 
+{
+    .i2c_port = I2C_NUM_0,
+    .i2c_addr = MPU6050_ADDRESS
+};
 
 esp_err_t loadPins(void)
 {
@@ -81,8 +89,11 @@ esp_err_t loadI2C(void)
 
     // init ssd1306
 
-    if (ssd1306_init(&dev))
+    if (ssd1306_init(&oled)&mpu6050_init(&mpu6050))
+    {
+        printf("okay\n");
     	return ESP_OK;
+    }
     else
     	return ESP_FAIL;
 }
@@ -119,21 +130,21 @@ void get_time()
         addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
         ESP_LOGI(TAG, "DNS lookup succeeded. IP=%s", inet_ntoa(*addr));
 
-        ssd1306_draw_string(&dev, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 0, "DNS successful.",
+        ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 0, "DNS successful.",
 	            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
 
       	vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-        ssd1306_load_frame_buffer(&dev, buff);
+        ssd1306_load_frame_buffer(&oled, buff);
 
         char ip_str[] = "IP - ";
 
         strcat(ip_str, inet_ntoa(*addr));
 
-        ssd1306_draw_string(&dev, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 10, ip_str,
+        ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 10, ip_str,
 	            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
 
-        ssd1306_load_frame_buffer(&dev, buff);
+        ssd1306_load_frame_buffer(&oled, buff);
 
         s = socket(res->ai_family, res->ai_socktype, 0);
         if(s < 0) {
@@ -144,12 +155,12 @@ void get_time()
         }
         ESP_LOGI(TAG, "... allocated socket");
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
 
-        ssd1306_draw_string(&dev, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 20, "Socket allocated",
+        ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 20, "Socket allocated",
 	            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
       	
-        ssd1306_load_frame_buffer(&dev, buff);
+        ssd1306_load_frame_buffer(&oled, buff);
 
 
         if(connect(s, res->ai_addr, res->ai_addrlen) != 0) {
@@ -171,13 +182,13 @@ void get_time()
         }
         ESP_LOGI(TAG, "... socket send success");
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
 
-        ssd1306_draw_string(&dev, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 30, "Connected!",
+        ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 30, "Connected!",
 	            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
       	
-        ssd1306_load_frame_buffer(&dev, buff);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        ssd1306_load_frame_buffer(&oled, buff);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
 
         struct timeval receiving_timeout;
         receiving_timeout.tv_sec = 5;
@@ -218,12 +229,16 @@ void get_time()
 
 
 	            clear_buffer();
-	            ssd1306_draw_string(&dev, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 0, time,
+	            ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 10, "TIME:",
 	            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
-	            ssd1306_draw_string(&dev, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 10, date,
+	            ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 20, time,
 	            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
-	            ssd1306_load_frame_buffer(&dev, buff);
-	            ssd1306_display_on(&dev, true);
+	            ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 30, "DATE:",
+	            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
+	            ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 40, date,
+	            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
+	            ssd1306_load_frame_buffer(&oled, buff);
+	            ssd1306_display_on(&oled, true);
             }
 
             cJSON_Delete(root);
@@ -235,6 +250,8 @@ void get_time()
         close(s);
 
         vTaskDelay(3000 / portTICK_PERIOD_MS);
+        ssd1306_display_on(&oled, false);
+        clear_buffer();
         break;
     }
 
@@ -251,34 +268,102 @@ void looper(void *pvParameters)
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(example_connect());
 
-    ssd1306_display_on(&dev, true);
+    ssd1306_display_on(&oled, true);
 	clear_buffer();
-	ssd1306_load_frame_buffer(&dev, buff);
+	ssd1306_load_frame_buffer(&oled, buff);
 
+    int upCount = 0;
+    ssd1306_display_on(&oled, true);
+    clear_buffer();
+    ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 0, "ESP Smart Watch v1.0",
+                OLED_COLOR_WHITE, OLED_COLOR_BLACK);
+    ssd1306_load_frame_buffer(&oled, buff);
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    clear_buffer();
+    ssd1306_display_on(&oled, false);
     while(1)
     {
-    	if (!gpio_get_level(GPIO_NUM_14))
-    	{
-    		printf("%s\n", "here");
-            ssd1306_display_on(&dev, true);
-    		clear_buffer();
-    		ssd1306_draw_string(&dev, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 0, "Fetching the time!",
-            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
-            ssd1306_load_frame_buffer(&dev, buff);
-    		vTaskDelay(1000 / portTICK_PERIOD_MS);
-    		clear_buffer();
-            get_time();
-    	}
-    	else
-    	{
-    		ssd1306_display_on(&dev, false);
-    	}
+
+        int16_t rawAcc[6];
+        int16_t rawAccZ;
+        if (mpu6050_command_read(&mpu6050, MPU6050_WHO_AM_I, 1) == 0x68)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                rawAcc[i] = (int16_t)mpu6050_command_read(&mpu6050, MPU6050_ACCEL_XOUT_H+i, 1);
+            }
+
+            rawAccZ = rawAcc[4] << 8 | rawAcc[5];
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+        	if (rawAccZ > 14600 && rawAccZ < 17700)
+        	{
+                if (upCount == 0){
+                    // int16_t rawAcc[6];
+                    // int16_t rawTemp;
+
+                    // int16_t rawAccZ;
+
+                    // uint8_t* who_am_i = 0;
+                    // mpu6050_command_read(&mpu6050, MPU6050_WHO_AM_I, 1);
+                    // printf("%02x\n", mpu6050_command_read(&mpu6050, MPU6050_WHO_AM_I, 1));
+                    // printf("%d\n", mpu6050_command_read(&mpu6050, MPU6050_WHO_AM_I, 1));
+                    // vTaskDelay(50 / portTICK_PERIOD_MS);
+                    // rawTemp = (int16_t)mpu6050_command_read(&mpu6050, 0x41, 1) << 8;
+                    // rawTemp |= (int16_t)mpu6050_command_read(&mpu6050, 0x42, 1);
+                    // vTaskDelay(50 / portTICK_PERIOD_MS);
+                    // mpu6050_read(&mpu6050, MPU6050_ACCEL_XOUT_H, &sensor_data, 14);
+                    // for (int i = 0; i < 6; i++)
+                    // {
+                    //     rawAcc[i] = (int16_t)mpu6050_command_read(&mpu6050, MPU6050_ACCEL_XOUT_H+i, 1);
+                    // }
+
+                    // rawAccZ = rawAcc[4] << 8 | rawAcc[5];
+
+                    
+
+                    // printf("Raw Temp - %d\n", rawTemp);
+                    // printf("Raw Acc Z - %d\n", rawAccZ);
+                    // printf("%s\n", gcvt(temp));
+                    // printf("%s\n", tempString);
+
+                    ssd1306_display_on(&oled, true);
+            		clear_buffer();
+            		ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 0, "Fetching the time!",
+                    OLED_COLOR_WHITE, OLED_COLOR_BLACK);
+                    ssd1306_load_frame_buffer(&oled, buff);
+            		vTaskDelay(100 / portTICK_PERIOD_MS);
+            		clear_buffer();
+                    get_time();
+                    upCount = 1;
+                }
+        	}
+        	else
+        	{
+                upCount = 0;
+        	}
+        }
+        else
+        {
+            break;
+        }
 
     	vTaskDelay(50 / portTICK_PERIOD_MS);
+    }
+    while(1)
+    {
+        ssd1306_display_on(&oled, true);
+        clear_buffer();
+        ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 0, "Battery Low!",
+                    OLED_COLOR_WHITE, OLED_COLOR_BLACK);
+        ssd1306_load_frame_buffer(&oled, buff);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        clear_buffer();
+        ssd1306_display_on(&oled, false);
+        vTaskDelay(60000 / portTICK_PERIOD_MS);
     }
 }
 
 void app_main(void)
-{
+{   
 	xTaskCreate(&looper, "looper", 16384, NULL, 5, NULL);
 }
