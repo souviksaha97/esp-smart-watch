@@ -8,6 +8,8 @@
 #include <driver/i2c.h>
 #include <esp_err.h>
 
+#include <esp_sleep.h>
+
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -286,6 +288,8 @@ void looper(void *pvParameters)
 
         int16_t rawAcc[6];
         int16_t rawAccZ;
+        mpu6050_command_write(&mpu6050, MPU6050_PWR_MGMT_1, 0x08, 1);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
         if (mpu6050_command_read(&mpu6050, MPU6050_WHO_AM_I, 1) == 0x68)
         {
             for (int i = 0; i < 6; i++)
@@ -294,7 +298,7 @@ void looper(void *pvParameters)
             }
 
             rawAccZ = rawAcc[4] << 8 | rawAcc[5];
-            vTaskDelay(500 / portTICK_PERIOD_MS);
+            // vTaskDelay(500 / portTICK_PERIOD_MS);
         	if (rawAccZ > 14600 && rawAccZ < 17700)
         	{
                 if (upCount == 0){
@@ -347,7 +351,10 @@ void looper(void *pvParameters)
             break;
         }
 
-    	vTaskDelay(50 / portTICK_PERIOD_MS);
+        mpu6050_command_write(&mpu6050, MPU6050_PWR_MGMT_1, 0x48, 1);
+    	// vTaskDelay(100 / portTICK_PERIOD_MS);
+        // ESP_LOGI(TAG, "Sleep%d", esp_sleep_enable_timer_wakeup(10000));
+        esp_sleep_enable_timer_wakeup(20000);
     }
     while(1)
     {
