@@ -256,6 +256,8 @@ void get_time()
             clear_buffer();
             ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 10, "Could not fetch time! :(",
             OLED_COLOR_WHITE, OLED_COLOR_BLACK);
+            ssd1306_load_frame_buffer(&oled, buff);
+            ssd1306_display_on(&oled, true);
         }
 
         vTaskDelay(3000 / portTICK_PERIOD_MS);
