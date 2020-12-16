@@ -251,6 +251,13 @@ void get_time()
         ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d\r\n", r, errno);
         close(s);
 
+        if (errno == 128)
+        {
+            clear_buffer();
+            ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 10, "Could not fetch time! :(",
+            OLED_COLOR_WHITE, OLED_COLOR_BLACK);
+        }
+
         vTaskDelay(3000 / portTICK_PERIOD_MS);
         ssd1306_display_on(&oled, false);
         clear_buffer();
@@ -285,9 +292,10 @@ void looper(void *pvParameters)
     ssd1306_display_on(&oled, false);
     while(1)
     {
-
         int16_t rawAcc[6];
         int16_t rawAccZ;
+
+        //
         mpu6050_command_write(&mpu6050, MPU6050_PWR_MGMT_1, 0x08, 1);
         vTaskDelay(10 / portTICK_PERIOD_MS);
         if (mpu6050_command_read(&mpu6050, MPU6050_WHO_AM_I, 1) == 0x68)
@@ -299,7 +307,9 @@ void looper(void *pvParameters)
 
             rawAccZ = rawAcc[4] << 8 | rawAcc[5];
             // vTaskDelay(500 / portTICK_PERIOD_MS);
-        	if (rawAccZ > 14600 && rawAccZ < 17700)
+
+            printf("%d %d\n", rawAccZ, upCount);
+        	if (rawAccZ > 14745 && rawAccZ < 18022)
         	{
                 if (upCount == 0){
                     // int16_t rawAcc[6];
@@ -352,9 +362,8 @@ void looper(void *pvParameters)
         }
 
         mpu6050_command_write(&mpu6050, MPU6050_PWR_MGMT_1, 0x48, 1);
-    	// vTaskDelay(100 / portTICK_PERIOD_MS);
-        // ESP_LOGI(TAG, "Sleep%d", esp_sleep_enable_timer_wakeup(10000));
-        esp_sleep_enable_timer_wakeup(20000);
+    	vTaskDelay(1000 / portTICK_PERIOD_MS);
+
     }
     while(1)
     {
@@ -363,7 +372,7 @@ void looper(void *pvParameters)
         ssd1306_draw_string(&oled, buff, font_builtin_fonts[FONT_FACE_GLCD5x7], 0, 0, "Battery Low!",
                     OLED_COLOR_WHITE, OLED_COLOR_BLACK);
         ssd1306_load_frame_buffer(&oled, buff);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(5000 / portTICK_PERIOD_MS); 
         clear_buffer();
         ssd1306_display_on(&oled, false);
         vTaskDelay(60000 / portTICK_PERIOD_MS);
