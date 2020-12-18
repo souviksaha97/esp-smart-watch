@@ -32,7 +32,7 @@
 #define BUTTON GPIO_Pin_14
 #define WEB_SERVER "worldtimeapi.org"
 #define WEB_PORT 80
-#define WEB_URL "http://worldtimeapi.org/api/ip"
+#define WEB_URL "http://worldtimeapi.org/api/timezone/asia/kolkata"
 
 #define SCL_PIN 5
 #define SDA_PIN 4
